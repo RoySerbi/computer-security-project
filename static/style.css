@@ -98,7 +98,7 @@ p a:hover {
 }
 
 .flashes li {
-  color: red;
+  color: rgb(170, 33, 33);
   display: block;
   margin-bottom: 10px;
   width: 100%
