@@ -12,10 +12,13 @@ load_dotenv()
 password = os.getenv("MYSQL_ROOT_PASSWORD")
 
 conn = None
+DB_HOST = os.getenv("MYSQL_HOST", "database")
+DB_PORT = int(os.getenv("MYSQL_PORT", "3306"))
 while True:
     try:
         conn = mysql.connector.connect(
-            host="172.17.0.1",
+            host=DB_HOST,
+            port=DB_PORT,
             user="root",
             password=password,
             database="CommunicationLTD",
@@ -29,7 +32,8 @@ def reconnect_to_database():
     global conn
     try:
         conn = mysql.connector.connect(
-            host="172.17.0.1",
+            host=DB_HOST,
+            port=DB_PORT,
             user="root",
             password=password,
             database="CommunicationLTD",
