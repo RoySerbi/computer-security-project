@@ -58,7 +58,7 @@ def get_user_data_from_db(username=None, password=None):
         if username and password:
             cursor.execute(f"SELECT * FROM users WHERE username = '{username}' AND password = '{password}'")
         else:
-            cursor.execute(f"SELECT * FROM users WHERE username = '{username}'", multi=True)
+            cursor.execute(f"SELECT * FROM users WHERE username = '{username}'")
         return cursor.fetchone()
 
 @ensure_connection
@@ -184,19 +184,41 @@ def insert_password_reset(email, hash_code):
 
 
 def send_email(mail, recipient, hash_code):
-    msg = Message(
-        "Confirm Password Change",
-        sender="noreply@communicationltd.com",
-        recipients=[recipient],
-    )
-    msg.body = (
-        "Hello,\nWe've received a request to reset your password. If you want to reset your password, "
-        "click the link below and enter your new password\n http://localhost:5000/password_change/"
-        + hash_code
-        + "\n\nOr enter the following code in the password reset page: "
-        + hash_code
-    )
-    mail.send(msg)
+    import os
+    
+    # Check if mail credentials are set (not default values)
+    mail_username = os.getenv("MAIL_USERNAME", "YOURUSERNAME")
+    mail_password = os.getenv("MAIL_PASSWORD", "YOURPASSWORD")
+    
+    # If using default credentials, print token to console instead
+    if mail_username == "YOURUSERNAME" or mail_password == "YOURPASSWORD":
+        print("=" * 60)
+        print("MAIL NOT CONFIGURED - Password Reset Token (for development):")
+        print(f"Email: {recipient}")
+        print(f"Reset Token: {hash_code}")
+        print(f"Reset URL: http://localhost:5000/password_change/{hash_code}")
+        print("=" * 60)
+        return
+    
+    # Try to send email if credentials are configured
+    try:
+        msg = Message(
+            "Confirm Password Change",
+            sender="noreply@communicationltd.com",
+            recipients=[recipient],
+        )
+        msg.body = (
+            "Hello,\nWe've received a request to reset your password. If you want to reset your password, "
+            "click the link below and enter your new password\n http://localhost:5000/password_change/"
+            + hash_code
+            + "\n\nOr enter the following code in the password reset page: "
+            + hash_code
+        )
+        mail.send(msg)
+    except Exception as e:
+        print(f"Failed to send email: {e}")
+        print(f"Password reset token for {recipient}: {hash_code}")
+        raise
 
 @ensure_connection
 def change_user_password_in_db(email, new_password) -> bool:
