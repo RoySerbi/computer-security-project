@@ -31,7 +31,7 @@
         </div>
         <br><br>
         <button type="submit">Create New Account</button>
-        {% with messages = get_flashed_messages() %}
+         {% with messages = get_flashed_messages() %}
         {% if messages %}
         <ul class="flashes">
             {% for message in messages %}
@@ -40,12 +40,11 @@
         </ul>
         {% endif %}
         {% endwith %}
-
     </form>
+
         <form method="GET" action="{{ url_for('login') }}">
         <button type="submit">Back to login page</button>
     </form>
-
 </div>
 </body>
 </html>
