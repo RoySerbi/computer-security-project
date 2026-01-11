@@ -10,7 +10,7 @@
 <div class="container">
     {% autoescape false %}
 
-    <h1>Welcome, {{ username }}!</h1>
+    <h1 id="titleDash">Welcome, {{ username }}!</h1>
 
 
     <a href="{{ url_for('logout') }}">
@@ -26,9 +26,9 @@
     <a href="{{ url_for('add_new_client') }}">
         <button type="submit">Add New Client</button>
     </a>
-    <br> <br> <br>
+    <br> <br> 
      <form action="{{ url_for('search_client_data') }}" method="POST">
-            <h2>search for client:</h2>
+            <h2 id="titleDash">Search For Client:</h2>
         <label for="first_name">First Name:</label>
         <input type="text" id="first_name" name="first_name" placeholder="Enter client first name">
 

@@ -35,22 +35,24 @@ body {
 }
 
 .container {
-  width: 25vw;
-  height: 70vh;
-  margin: 50px auto;
-  padding: 20px;
+  width: 24vw;
+  height: 85vh;
+  margin: 40px auto;
+  padding: 12px;
   border-radius: 8px;
   background-color: #10263ce7;
   border: solid 1.5px black;
   box-shadow: 0 7px 10px rgba(0, 0.2, 0.4, 0.8); 
-
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .login-container{
-   width: 25vw;
-   height: 70vh;
-  margin: 50px auto;
-  padding: 20px;
+   width: 24vw;
+   height: 85vh;
+  margin: 40px auto;
+  padding: 10px;
   border-radius: 8px;
   box-shadow: 0 0 10px rgba(0,0,0,.1);
   background-color: #10263ce7;
@@ -67,7 +69,7 @@ body {
 }
 
 #registerCon{
-  height: 80vh;
+  height: 90vh;
 }
 
 .success-message,form,h1,table {
@@ -92,7 +94,11 @@ form {
 }
 
 h1 {
-  font-size: 24px
+  font-size: 26px
+}
+
+#titleDash{
+  font-size: 17px
 }
 
 label {
@@ -115,7 +121,7 @@ input,select {
 }
 
 button {
-  padding: 10px 20px;
+  padding: 10px 10px;
   background-color: #252320;
   color: #fff;
   border: 0;
@@ -199,6 +205,8 @@ tr:nth-child(even) {
   width: 400px;
   margin: 50px auto;
   padding: 20px;
+  /* padding: 4rem; */
+  padding-bottom: 1rem;
   background-color: #10263ce7;
   box-shadow: 0 0 10px rgba(0,0,0,.1);
   border: solid 1.5px black;

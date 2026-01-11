@@ -18,7 +18,6 @@
 
         <label for="sector_id">Client Sector</label>
         <select id="sector_id" name="sector_id" required>
-
             {% for sector in sectors %}
             <option value="{{ sector[1] }}">{{ sector[0] }}</option>
             {% endfor %}
