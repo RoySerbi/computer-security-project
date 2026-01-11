@@ -6,6 +6,7 @@ from flask import flash
 from app_configuration import *
 from flask_mail import Message
 import hashlib
+from functools import wraps
 
 load_dotenv()
 password = os.getenv("MYSQL_ROOT_PASSWORD")
@@ -24,18 +25,43 @@ while True:
         print(f"Something went wrong: {err}")
         time.sleep(1)
 
+def reconnect_to_database():
+    global conn
+    try:
+        conn = mysql.connector.connect(
+            host="172.17.0.1",
+            user="root",
+            password=password,
+            database="CommunicationLTD",
+        )
+        print("Reconnected to the database.")
+    except mysql.connector.Error as err:
+        print(f"Failed to reconnect: {err}")
 
+# Decorator to ensure connection
+def ensure_connection(func):
+    @wraps(func)
+    def wrapper_ensure_connection(*args, **kwargs):
+        global conn
+        try:
+            # Attempt to execute a simple command to check connection
+            conn.ping(reconnect=True, attempts=3, delay=5)
+        except mysql.connector.Error as err:
+            print(f"Connection lost: {err}. Attempting to reconnect...")
+            reconnect_to_database()
+        return func(*args, **kwargs)
+    return wrapper_ensure_connection
+
+@ensure_connection
 def get_user_data_from_db(username=None, password=None):
-    with conn.cursor(dictionary=True) as cursor:
+    with conn.cursor(dictionary=True, buffered=True) as cursor:
         if username and password:
-            query = "SELECT * FROM users WHERE username = %s AND password = %s"
-            cursor.execute(query, (username, password))
+            cursor.execute(f"SELECT * FROM users WHERE username = '{username}' AND password = '{password}'")
         else:
-            query = "SELECT * FROM users WHERE username = %s"
-            cursor.execute(query, (username,))
+            cursor.execute(f"SELECT * FROM users WHERE username = '{username}'", multi=True)
         return cursor.fetchone()
 
-
+@ensure_connection
 def get_all_sectors_names_from_db():
     with conn.cursor(dictionary=True) as cursor:
         cursor.execute("SELECT sector_name FROM sectors")
@@ -43,7 +69,7 @@ def get_all_sectors_names_from_db():
         sectors = [sector["sector_name"] for sector in sectors]
     return sectors
 
-
+@ensure_connection
 def insert_new_client(client_data):
     with conn.cursor(dictionary=True) as cursor:
         cursor.execute(
@@ -63,9 +89,9 @@ def insert_new_client(client_data):
     conn.commit()
     return client_id
 
-
+@ensure_connection
 def get_user_sectors(user_id):
-    with conn.cursor(dictionary=True) as cursor:
+    with conn.cursor(dictionary=True, buffered=True) as cursor:
         cursor.execute(
             "SELECT sector_name, sectors.sector_id FROM sectors JOIN user_sectors ON sectors.sector_id = user_sectors.sector_id WHERE user_id = %s",
             (user_id,),
@@ -74,52 +100,43 @@ def get_user_sectors(user_id):
         sectors = [(sector["sector_name"], sector["sector_id"]) for sector in sectors]
     return sectors
 
-
+@ensure_connection
 def get_client_data(client_id):
     with conn.cursor(dictionary=True) as cursor:
         cursor.execute("SELECT * FROM clients WHERE client_id = %s", (client_id,))
         return cursor.fetchone()
 
-
+@ensure_connection
 def get_client_data_by_name(first_name, last_name):
-    with conn.cursor(dictionary=True) as cursor:
-        cursor.execute(
-            "SELECT * FROM clients WHERE first_name = %s AND last_name = %s",
-            (first_name, last_name),
-        )
+    with conn.cursor(dictionary=True, buffered=True) as cursor:
+        cursor.execute(f"SELECT * FROM clients WHERE first_name = '{first_name}' AND last_name = '{last_name}'")
         return cursor.fetchall()
 
-
+@ensure_connection
 def get_user_salt(user_id):
     with conn.cursor(dictionary=True) as cursor:
         cursor.execute("SELECT * FROM user_info WHERE user_id = %s", (user_id,))
         return cursor.fetchone()["salt"]
 
-
+@ensure_connection
 def check_if_user_exists_using_email(email: str) -> bool:
     with conn.cursor(dictionary=True) as cursor:
         cursor.execute("SELECT * FROM users WHERE email = %s ", (email,))
         if cursor.fetchone():  # todo: check if this condition works
-            return True
+            return True 
         return False
 
-
+@ensure_connection
 def insert_new_user_to_db(new_username, new_password, new_email, salt):
-    with conn.cursor(dictionary=True) as cursor:
-        cursor.execute(
-            "INSERT INTO users (username, password, email) VALUES (%s, %s, %s)",
-            (new_username, new_password, new_email),
-        )
+    with conn.cursor(dictionary=True, buffered=True) as cursor:
+        cursor.execute(f"INSERT INTO users (username, password, email) VALUES ('{new_username}', '{new_password}', '{new_email}')")
         user_id = cursor.lastrowid
         cursor.execute(
-            "INSERT INTO user_info (user_id,salt) VALUES (%s, %s)", (user_id, salt)
-        )
+            f"INSERT INTO user_info (user_id,salt) VALUES ('{user_id}', '{salt}')")
         cursor.execute(
-            "INSERT INTO password_history (user_id,password,salt) VALUES (%s, %s, %s)",
-            (user_id, new_password, salt),
-        )
+            f"INSERT INTO password_history (user_id,password,salt) VALUES ('{user_id}', '{new_password}', '{salt}')")
 
-
+@ensure_connection
 def insert_user_sectors_selected_to_db(publish_sectors, user_id):
     with conn.cursor(dictionary=True) as cursor:
         for sector in publish_sectors:
@@ -133,7 +150,7 @@ def insert_user_sectors_selected_to_db(publish_sectors, user_id):
             )
     conn.commit()
 
-
+@ensure_connection
 def validate_password(password) -> bool:
     password_policy, _ = get_password_policy()
     with open(os.path.abspath("passwords.txt"), "r") as common_passwords_file:
@@ -157,7 +174,7 @@ def validate_password(password) -> bool:
     else:
         return True
 
-
+@ensure_connection
 def insert_password_reset(email, hash_code):
     with conn.cursor(dictionary=True) as cursor:
         cursor.execute(
@@ -181,7 +198,7 @@ def send_email(mail, recipient, hash_code):
     )
     mail.send(msg)
 
-
+@ensure_connection
 def change_user_password_in_db(email, new_password) -> bool:
     # Check if the new password matches any of the previous passwords
     if check_previous_passwords(email, new_password):
@@ -197,7 +214,7 @@ def change_user_password_in_db(email, new_password) -> bool:
     with conn.cursor(dictionary=True) as cursor:
         cursor.execute(
             """UPDATE users SET password = %s WHERE email = %s""",
-            (new_password_hashed_hex, email),
+            (new_password, email),
         )
         cursor.execute(
             """UPDATE user_info SET salt = %s WHERE user_id = (SELECT user_id FROM users WHERE email = %s)""",
@@ -205,12 +222,12 @@ def change_user_password_in_db(email, new_password) -> bool:
         )
         cursor.execute(
             """INSERT INTO password_history (user_id,password,salt) VALUES ((SELECT user_id FROM users WHERE email = %s), %s, %s)""",
-            (email, new_password_hashed_hex, user_salt_hex),
+            (email, new_password, user_salt_hex),
         )
         conn.commit()
     return True
 
-
+@ensure_connection
 def check_previous_passwords(email, user_new_password):
     with conn.cursor(dictionary=True) as cursor:
         # Get the user_id based on the email
@@ -229,25 +246,16 @@ def check_previous_passwords(email, user_new_password):
 
 def compare_passwords(user_new_password, previous_passwords_data) -> bool:
     for previous_password, previous_salt in previous_passwords_data:
-        previous_salt_bytes = bytes.fromhex(previous_salt)
-        user_salted_password = hashlib.pbkdf2_hmac(
-            "sha256", user_new_password.encode("utf-8"), previous_salt_bytes, 100000
-        )
-        if user_salted_password == bytes.fromhex(previous_password):
+        if user_new_password == previous_password:
             return True
     return False
 
 
 def compare_to_current_password(user_data, password) -> bool:
     current_password = user_data["password"]
-    current_salt = bytes.fromhex(get_user_salt(user_data["user_id"]))
-    hashed_password = hashlib.pbkdf2_hmac(
-        "sha256", password.encode("utf-8"), current_salt, 100000
-    )
-    if hashed_password == bytes.fromhex(current_password):
+    if current_password == password:
         return True
-    else:
-        return False
+    return False
 
 
 def generate_new_password_hashed(new_password, generate_to_hex=False):
@@ -261,6 +269,7 @@ def generate_new_password_hashed(new_password, generate_to_hex=False):
     return new_password_hashed, user_salt
 
 
+@ensure_connection
 def check_if_reset_token_exists(reset_token):
     with conn.cursor(dictionary=True) as cursor:
         hashed_token = hashlib.sha1(reset_token.encode("utf-8")).digest().hex()
