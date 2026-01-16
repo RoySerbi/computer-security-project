@@ -17,4 +17,6 @@ services:
     depends_on:
       - database
     user: root
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
     command: /bin/bash -c "python backend.py"
