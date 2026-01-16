@@ -6,8 +6,8 @@ import json
 from password_strength import PasswordPolicy
 
 SALT_LENGTH = 32
-FAILED_LOGIN_ATTEMPTS = 3
-BLOCK_TIME_SECONDS = 300
+FAILED_LOGIN_ATTEMPTS = 7
+BLOCK_TIME_SECONDS = 120
 
 
 def app_configuration(app: Flask):

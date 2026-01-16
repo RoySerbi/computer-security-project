@@ -48,9 +48,9 @@ def login():
     if request.method == "POST":
         username = request.form.get("username")
         password = request.form.get("password")
+        user_data = get_user_data_from_db(username=username)
 
-        user_data = get_user_data_from_db(username=username, password=password)
-        if user_data:
+        if user_data and compare_to_current_password(user_data, password):
             session["username"] = user_data["username"]
             session["user_id"] = user_data["user_id"]
             failed_login_attempts[request.remote_addr] = 0
@@ -60,11 +60,7 @@ def login():
             failed_login_attempts[request.remote_addr] += 1
             return redirect(url_for("login"))
 
-    return render_template(
-        "login.html",
-        user_added=request.args.get("user_added"),
-        password_changed=request.args.get("password_changed"),
-    )
+    return render_template("login.html")
 
 
 @app.route("/logout")
@@ -96,9 +92,8 @@ def register():
         new_password_hashed_hex, user_salt_hex = generate_new_password_hashed(
             new_password, generate_to_hex=True
         )
-        insert_new_user_to_db(
-            new_username, new_password, new_email, user_salt_hex
-        )
+        insert_new_user_to_db(new_username, new_password, new_email)
+
         user_id = get_user_data_from_db(username=new_username)["user_id"]
         insert_user_sectors_selected_to_db(publish_sectors, user_id)
         session["username"] = new_username
