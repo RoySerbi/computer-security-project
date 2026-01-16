@@ -7,6 +7,7 @@ We used the following technologies in our project:
 | :---:   | :---: | :---: | :---: |
 | Microsoft SQL 2022 | Flask   | Docker   | Jinja2 |
 
+
 * The UI used plain HTML and CSS (no CSS frameworks).
 
 ## Switch Between The Vulnerable And Safe Codes
