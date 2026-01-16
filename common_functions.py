@@ -15,7 +15,7 @@ conn = None
 while True:
     try:
         conn = mysql.connector.connect(
-            host="172.17.0.1",
+            host="database",
             user="root",
             password=password,
             database="CommunicationLTD",
@@ -29,7 +29,7 @@ def reconnect_to_database():
     global conn
     try:
         conn = mysql.connector.connect(
-            host="172.17.0.1",
+            host="database",
             user="root",
             password=password,
             database="CommunicationLTD",
