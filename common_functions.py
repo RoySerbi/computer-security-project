@@ -12,7 +12,7 @@ load_dotenv()
 password = os.getenv("MYSQL_ROOT_PASSWORD")
 
 conn = None
-DB_HOST = os.getenv("MYSQL_HOST", "database")
+DB_HOST = os.getenv("MYSQL_HOST", "database-safe")
 DB_PORT = int(os.getenv("MYSQL_PORT", "3306"))
 while True:
     try:
