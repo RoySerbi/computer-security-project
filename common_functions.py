@@ -12,7 +12,7 @@ load_dotenv()
 password = os.getenv("MYSQL_ROOT_PASSWORD")
 
 conn = None
-DB_HOST = os.getenv("MYSQL_HOST", "database")
+DB_HOST = os.getenv("MYSQL_HOST", "database-safe")
 DB_PORT = int(os.getenv("MYSQL_PORT", "3306"))
 while True:
     try:
@@ -57,12 +57,9 @@ def ensure_connection(func):
     return wrapper_ensure_connection
 
 @ensure_connection
-def get_user_data_from_db(username=None, password=None):
+def get_user_data_from_db(username=None):
     with conn.cursor(dictionary=True, buffered=True) as cursor:
-        if username and password:
-            cursor.execute(f"SELECT * FROM users WHERE username = '{username}' AND password = '{password}'")
-        else:
-            cursor.execute(f"SELECT * FROM users WHERE username = '{username}'")
+        cursor.execute("SELECT * FROM users WHERE username = %s", (username,))
         return cursor.fetchone()
 
 @ensure_connection
@@ -113,8 +110,14 @@ def get_client_data(client_id):
 @ensure_connection
 def get_client_data_by_name(first_name, last_name):
     with conn.cursor(dictionary=True, buffered=True) as cursor:
-        cursor.execute(f"SELECT * FROM clients WHERE first_name = '{first_name}' AND last_name = '{last_name}'")
+        cursor.execute(
+            "SELECT * FROM clients WHERE first_name = %s AND last_name = %s",
+            (first_name, last_name),
+        )
         return cursor.fetchall()
+
+
+
 
 @ensure_connection
 def get_user_salt(user_id):
@@ -131,14 +134,29 @@ def check_if_user_exists_using_email(email: str) -> bool:
         return False
 
 @ensure_connection
-def insert_new_user_to_db(new_username, new_password, new_email, salt):
+def insert_new_user_to_db(new_username, new_password, new_email):
+    pwd_hash_hex, salt_hex = generate_new_password_hashed(new_password, generate_to_hex=True)
+
     with conn.cursor(dictionary=True, buffered=True) as cursor:
-        cursor.execute(f"INSERT INTO users (username, password, email) VALUES ('{new_username}', '{new_password}', '{new_email}')")
+        cursor.execute(
+            "INSERT INTO users (username, password, email) VALUES (%s, %s, %s)",
+            (new_username, pwd_hash_hex, new_email),
+        )
         user_id = cursor.lastrowid
+
         cursor.execute(
-            f"INSERT INTO user_info (user_id,salt) VALUES ('{user_id}', '{salt}')")
+            "INSERT INTO user_info (user_id, salt) VALUES (%s, %s)",
+            (user_id, salt_hex),
+        )
+
         cursor.execute(
-            f"INSERT INTO password_history (user_id,password,salt) VALUES ('{user_id}', '{new_password}', '{salt}')")
+            "INSERT INTO password_history (user_id, password, salt) VALUES (%s, %s, %s)",
+            (user_id, pwd_hash_hex, salt_hex),
+        )
+
+    conn.commit()
+    return user_id
+
 
 @ensure_connection
 def insert_user_sectors_selected_to_db(publish_sectors, user_id):
@@ -226,31 +244,30 @@ def send_email(mail, recipient, hash_code):
 
 @ensure_connection
 def change_user_password_in_db(email, new_password) -> bool:
-    # Check if the new password matches any of the previous passwords
     if check_previous_passwords(email, new_password):
-        flash(
-            "Please enter a new password that is not the same as your previous passwords."
-        )
+        flash("Please enter a new password that is not the same as your previous passwords.")
         return False
+
     new_password_hashed_hex, user_salt_hex = generate_new_password_hashed(
         new_password, generate_to_hex=True
     )
 
-    # Update the user's password in the database
     with conn.cursor(dictionary=True) as cursor:
         cursor.execute(
-            """UPDATE users SET password = %s WHERE email = %s""",
-            (new_password, email),
+            "UPDATE users SET password = %s WHERE email = %s",
+            (new_password_hashed_hex, email),
         )
         cursor.execute(
-            """UPDATE user_info SET salt = %s WHERE user_id = (SELECT user_id FROM users WHERE email = %s)""",
+            "UPDATE user_info SET salt = %s WHERE user_id = (SELECT user_id FROM users WHERE email = %s)",
             (user_salt_hex, email),
         )
         cursor.execute(
-            """INSERT INTO password_history (user_id,password,salt) VALUES ((SELECT user_id FROM users WHERE email = %s), %s, %s)""",
-            (email, new_password, user_salt_hex),
+            "INSERT INTO password_history (user_id, password, salt) "
+            "VALUES ((SELECT user_id FROM users WHERE email = %s), %s, %s)",
+            (email, new_password_hashed_hex, user_salt_hex),
         )
         conn.commit()
+
     return True
 
 @ensure_connection
@@ -278,10 +295,12 @@ def compare_passwords(user_new_password, previous_passwords_data) -> bool:
 
 
 def compare_to_current_password(user_data, password) -> bool:
-    current_password = user_data["password"]
-    if current_password == password:
-        return True
-    return False
+    current_hash_hex = user_data["password"]
+    salt_hex = get_user_salt(user_data["user_id"])
+    salt_bytes = bytes.fromhex(salt_hex)
+
+    hashed = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt_bytes, 100000)
+    return hashed.hex() == current_hash_hex
 
 
 def generate_new_password_hashed(new_password, generate_to_hex=False):
